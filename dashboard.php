@@ -328,7 +328,7 @@ $result = $conn->query("SELECT * FROM coworking_spaces ORDER BY name ASC");
                         
                         <div class="info-row"><i class="ph ph-map-pin-line"></i> <?php echo htmlspecialchars($row['address']); ?></div>
                         <div class="info-row"><i class="ph ph-phone"></i> <?php echo htmlspecialchars($row['tel']); ?></div>
-                        <div class="info-row"><i class="ph ph-envelope-simple"></i> <?php echo htmlspecialchars($row['email']??''); ?></div>
+                        <div class="info-row"><i class="ph ph-envelope-simple"></i> <?php echo htmlspecialchars($row['email'] ?? ''); ?></div>
                         
                         <?php if(!empty($row['notes'])): ?>
                             <div class="notes-box">
