@@ -20,8 +20,24 @@ if (isset($_GET['logout'])) {
 }
 
 // --- 2. DATABASE CONNECTION ---
-$conn = new mysqli("localhost", "root", "", "nasacloud_db");
-if ($conn->connect_error) { die("Connection failed: " . $conn->connect_error); }
+// Parse the Render URL into a PDO-friendly format
+$dbUrl = getenv("DATABASE_URL") ?: "postgresql://coworking_space_user:COkaIq65PtNcfNvOa1FeZqepgqYNONQY@dpg-d9l6djvavr4c73a4g6f0-a/coworking_space";
+$dbopts = parse_url($dbUrl);
+
+$host = $dbopts["host"];
+$port = $dbopts["port"] ?? 5432;
+$user = $dbopts["user"];
+$password = $dbopts["pass"];
+$dbname = ltrim($dbopts["path"], '/');
+
+$dsn = "pgsql:host=$host;port=$port;dbname=$dbname;user=$user;password=$password";
+
+try {
+    $conn = new PDO($dsn);
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("Connection failed: " . $e->getMessage());
+}
 
 $regions = ["Ariana", "Béja", "Ben Arous", "Bizerte", "Gabès", "Gafsa", "Jendouba", "Kairouan", "Kasserine", "Kebili", "Kef", "Mahdia", "Manouba", "Medenine", "Monastir", "Nabeul", "Sfax", "Sidi Bouzid", "Siliana", "Sousse", "Tataouine", "Tozeur", "Tunis", "Zaghouan"];
 
@@ -29,17 +45,18 @@ $regions = ["Ariana", "Béja", "Ben Arous", "Bizerte", "Gabès", "Gafsa", "Jendo
 // Handle Adding New Space
 if (isset($_POST['add_space'])) {
     $stmt = $conn->prepare("INSERT INTO coworking_spaces (name, region, address, email, tel, website, notes) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("sssssss", $_POST['name'], $_POST['region'], $_POST['address'], $_POST['email'], $_POST['tel'], $_POST['website'], $_POST['notes']);
-    $stmt->execute();
-    $stmt->close();
+    $stmt->execute([
+        $_POST['name'], $_POST['region'], $_POST['address'], 
+        $_POST['email'], $_POST['tel'], $_POST['website'], $_POST['notes']
+    ]);
     header("Location: dashboard.php?msg=added");
     exit;
 }
 
 // Handle Deleting a Space
 if (isset($_GET['delete_id'])) {
-    $id = $_GET['delete_id'];
-    $conn->query("DELETE FROM coworking_spaces WHERE id = $id");
+    $stmt = $conn->prepare("DELETE FROM coworking_spaces WHERE id = ?");
+    $stmt->execute([(int)$_GET['delete_id']]);
     header("Location: dashboard.php?msg=deleted");
     exit;
 }
@@ -302,7 +319,7 @@ $result = $conn->query("SELECT * FROM coworking_spaces ORDER BY name ASC");
             </details>
 
             <div class="grid" id="container">
-                <?php while($row = $result->fetch_assoc()): ?>
+                <?php while($row = $result->fetch(PDO::FETCH_ASSOC)): ?>
                     <div class="card" data-region="<?php echo htmlspecialchars($row['region']); ?>">
                         <div class="card-header">
                             <h3><?php echo htmlspecialchars($row['name']); ?></h3>

@@ -3,37 +3,49 @@ session_start();
 // Security check: must be logged in
 if (!isset($_SESSION['loggedin'])) { header("Location: index.php"); exit; }
 
-$conn = new mysqli("localhost", "root", "", "nasacloud_db");
-if ($conn->connect_error) { die("Connection failed: " . $conn->connect_error); }
+// Parse the Render URL into a PDO-friendly format
+$dbUrl = getenv("DATABASE_URL") ?: "postgresql://coworking_space_user:COkaIq65PtNcfNvOa1FeZqepgqYNONQY@dpg-d9l6djvavr4c73a4g6f0-a/coworking_space";
+$dbopts = parse_url($dbUrl);
+
+$host = $dbopts["host"];
+$port = $dbopts["port"] ?? 5432;
+$user = $dbopts["user"];
+$password = $dbopts["pass"];
+$dbname = ltrim($dbopts["path"], '/');
+
+$dsn = "pgsql:host=$host;port=$port;dbname=$dbname;user=$user;password=$password";
+
+try {
+    $conn = new PDO($dsn);
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("Connection failed: " . $e->getMessage());
+}
 
 $regions = ["Ariana", "Béja", "Ben Arous", "Bizerte", "Gabès", "Gafsa", "Jendouba", "Kairouan", "Kasserine", "Kebili", "Kef", "Mahdia", "Manouba", "Medenine", "Monastir", "Nabeul", "Sfax", "Sidi Bouzid", "Siliana", "Sousse", "Tataouine", "Tozeur", "Tunis", "Zaghouan"];
 
 // --- 1. GET CURRENT DATA ---
 if (isset($_GET['id'])) {
-    $id = $_GET['id'];
-    // Using a prepared statement for security
     $stmt = $conn->prepare("SELECT * FROM coworking_spaces WHERE id = ?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $data = $result->fetch_assoc();
-    $stmt->close();
+    $stmt->execute([(int)$_GET['id']]);
+    $data = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$data) { die("Space not found."); }
 }
 
 // --- 2. UPDATE DATA ON SUBMIT ---
 if (isset($_POST['update_space'])) {
-    $id_to_update = $_POST['id'];
     $stmt = $conn->prepare("UPDATE coworking_spaces SET name=?, region=?, address=?, email=?, tel=?, website=?, notes=? WHERE id=?");
-    $stmt->bind_param("sssssssi", $_POST['name'], $_POST['region'], $_POST['address'], $_POST['email'], $_POST['tel'], $_POST['website'], $_POST['notes'], $id_to_update);
-    
-    if ($stmt->execute()) {
-        $stmt->close();
+    try {
+        $stmt->execute([
+            $_POST['name'], $_POST['region'], $_POST['address'], 
+            $_POST['email'], $_POST['tel'], $_POST['website'], 
+            $_POST['notes'], (int)$_POST['id']
+        ]);
         header("Location: dashboard.php?msg=updated");
         exit;
-    } else {
-        echo "Error updating record: " . $conn->error;
+    } catch (PDOException $e) {
+        echo "Error updating record: " . $e->getMessage();
     }
 }
 ?>
